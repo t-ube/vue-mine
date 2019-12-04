@@ -5,17 +5,17 @@
     <p v-else-if="complete" :class="{success: true}">Clear</p>
     <p v-else>Please click green cell</p>
     <div id="map">
-      <div v-for="cell in grid_size*grid_size"
-       v-on:click="dig_cell(cell-1)"
-       v-bind:key="cell.id"
+      <div v-for="i in cellcount"
+       v-on:click="dig_cell(i-1)"
+       v-bind:key="i.id"
        :class="{
          cell: true,
-         bomb: is_bomb[cell - 1] === 1 && gameover,
-         near: surround_bomb[cell - 1] > 0,
-         dig: is_dig[cell - 1] == 1,
-         flag: is_dig[cell - 1] == 2
+         bomb: cell_state[i - 1].is_bomb == true && gameover,
+         near: cell_state[i - 1].surround_bomb > 0,
+         dig: cell_state[i - 1].is_dig == 1,
+         flag: cell_state[i - 1].is_dig == 2
          }">
-         <span>{{surround_bomb[cell - 1]}}</span>
+         <span>{{cell_state[i - 1].surround_bomb}}</span>
       </div>
     </div>
     <button type="button" name="button1" v-on:click="select_tool('dig')">Dig</button>
@@ -31,20 +31,22 @@ export default {
   data () {
     return {
       grid_size: 6,
-      surround_bomb: [],
-      is_bomb: [],
-      is_dig: [],
+      cell_state: [],
       gameover: false,
       tool: 'dig',
       complete: false
     }
   },
+  computed: {
+    cellcount() {
+      return (this.grid_size*this.grid_size);
+    }
+  },
   // 初期化
   created() {
-      for(let n = 0; n <(this.grid_size*this.grid_size); n++){
-        this.surround_bomb[n] = 0;
-        this.is_bomb[n] = 0;
-        this.is_dig[n] = 0;
+      for(let n = 0; n < this.cellcount; n++){
+        let cell_temp = {surround_bomb: 0, is_bomb: false, is_dig: 0};
+        this.cell_state[n] = cell_temp;
       }
       this.randomize_bomb_index();
       this.set_surrounding_bombs_count();
@@ -54,8 +56,8 @@ export default {
       this.tool = tool;
     },
     check_complete() {
-      var result = this.is_dig.filter(function(value) {
-          return value == 0;
+      var result = this.cell_state.filter(function(value) {
+          return value.is_dig == 0;
       })
       return (result.length < 1);
     },
@@ -64,10 +66,14 @@ export default {
         if(this.is_bomb_index(index)){
           this.bomb(index);
         }else{
-          this.$set(this.is_dig, index, 1);
+          let cell = this.cell_state[index];
+          cell.is_dig = 1;
+          this.$set(this.cell_state, index, cell);
         }
       }else{
-        this.$set(this.is_dig, index, 2);
+        let cell = this.cell_state[index];
+        cell.is_dig = 2;
+        this.$set(this.cell_state, index, cell);
       }
       this.complete = this.check_complete();
     },
@@ -75,11 +81,13 @@ export default {
       this.gameover = true;
     },
     randomize_bomb_index() {
-      let bomb_index = Math.floor(Math.random() * this.grid_size * this.grid_size);
-      let bomb_index2 = Math.floor(Math.random() * this.grid_size * this.grid_size);
-      for(let n = 0; n <(this.grid_size*this.grid_size); n++){
+      let bomb_index = Math.floor(Math.random() * this.cellcount);
+      let bomb_index2 = Math.floor(Math.random() * this.cellcount);
+      for(let n = 0; n < this.cellcount; n++){
         if(bomb_index == n || bomb_index2 == n){
-          this.$set(this.is_bomb, n, 1);
+          let cell = this.cell_state[n];
+          cell.is_bomb = true;
+          this.$set(this.cell_state, n, cell);
         }
       }
     },
@@ -95,7 +103,8 @@ export default {
       return ((y*this.grid_size)+x);
     },
     is_bomb_index(index){
-      return (this.is_bomb[index] == 1);
+      if(index < 0) return false;
+      return (this.cell_state[index].is_bomb == true);
     },
     is_bomb_cell(x,y){
       return (this.is_bomb_index(this.get_index(x,y)));
@@ -115,10 +124,12 @@ export default {
       return counts;
     },
     set_surrounding_bombs_count () {
-      for(let n = 0; n <(this.grid_size*this.grid_size); n++){
+      for(let n = 0; n < this.cellcount; n++){
         let counts = this.count_surrounding_bombs(n);
         if(counts > 0){
-          this.$set(this.surround_bomb, n, counts);
+          this.cell_state[n] = Object.assign({}, this.cell_state[n], {
+            surround_bomb: counts
+          })
         }
       }
     }
